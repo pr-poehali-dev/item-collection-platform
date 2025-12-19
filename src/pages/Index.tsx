@@ -185,6 +185,20 @@ export default function Index() {
     toast.success('Шаблон скачан');
   };
 
+  const deleteProduct = (productId: string) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    const hasOrders = orders.some(o => o.productCode === product.code);
+    if (hasOrders) {
+      toast.error('Нельзя удалить товар, по которому есть заказы');
+      return;
+    }
+
+    setProducts(products.filter(p => p.id !== productId));
+    toast.success('Товар удалён');
+  };
+
   const aggregatedOrders = orders.reduce((acc, order) => {
     const key = `${order.productName}`;
     if (!acc[key]) {
@@ -459,6 +473,13 @@ export default function Index() {
                           <p className="font-medium">{product.name}</p>
                           <p className="text-sm text-muted-foreground">Код: {product.code} • {product.unit}</p>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteProduct(product.id)}
+                        >
+                          <Icon name="Trash2" size={16} className="text-destructive" />
+                        </Button>
                       </div>
                     ))}
                   </div>
