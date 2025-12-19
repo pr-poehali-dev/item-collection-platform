@@ -15,7 +15,6 @@ interface Product {
   id: string;
   code: string;
   name: string;
-  category: string;
   unit: string;
 }
 
@@ -29,16 +28,15 @@ interface OrderItem {
   userName: string;
 }
 
-const CATEGORIES = ['Овощи', 'Фрукты', 'Молочные продукты', 'Мясо и рыба', 'Бакалея', 'Напитки'];
 const USERS = Array.from({ length: 12 }, (_, i) => ({ id: `user${i + 1}`, name: `Пользователь ${i + 1}` }));
 
 const INITIAL_PRODUCTS: Product[] = [
-  { id: '1', code: 'TOV-001', name: 'Помидоры', category: 'Овощи', unit: 'кг' },
-  { id: '2', code: 'TOV-002', name: 'Огурцы', category: 'Овощи', unit: 'кг' },
-  { id: '3', code: 'TOV-003', name: 'Яблоки', category: 'Фрукты', unit: 'кг' },
-  { id: '4', code: 'TOV-004', name: 'Молоко', category: 'Молочные продукты', unit: 'л' },
-  { id: '5', code: 'TOV-005', name: 'Курица', category: 'Мясо и рыба', unit: 'кг' },
-  { id: '6', code: 'TOV-006', name: 'Рис', category: 'Бакалея', unit: 'кг' },
+  { id: '1', code: 'TOV-001', name: 'Помидоры', unit: 'кг' },
+  { id: '2', code: 'TOV-002', name: 'Огурцы', unit: 'кг' },
+  { id: '3', code: 'TOV-003', name: 'Яблоки', unit: 'кг' },
+  { id: '4', code: 'TOV-004', name: 'Молоко', unit: 'л' },
+  { id: '5', code: 'TOV-005', name: 'Курица', unit: 'кг' },
+  { id: '6', code: 'TOV-006', name: 'Рис', unit: 'кг' },
 ];
 
 export default function Index() {
@@ -46,16 +44,14 @@ export default function Index() {
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [currentUser, setCurrentUser] = useState<string>('user1');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isAdmin, setIsAdmin] = useState(false);
 
-  const [newProduct, setNewProduct] = useState({ code: '', name: '', category: '', unit: '' });
+  const [newProduct, setNewProduct] = useState({ code: '', name: '', unit: '' });
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           product.code.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    return matchesSearch;
   });
 
   const addToOrder = (product: Product, quantity: number) => {
@@ -96,7 +92,7 @@ export default function Index() {
   };
 
   const addProduct = () => {
-    if (!newProduct.code || !newProduct.name || !newProduct.category || !newProduct.unit) {
+    if (!newProduct.code || !newProduct.name || !newProduct.unit) {
       toast.error('Заполните все поля');
       return;
     }
@@ -110,12 +106,11 @@ export default function Index() {
       id: Date.now().toString(),
       code: newProduct.code,
       name: newProduct.name,
-      category: newProduct.category,
       unit: newProduct.unit,
     };
 
     setProducts([...products, product]);
-    setNewProduct({ code: '', name: '', category: '', unit: '' });
+    setNewProduct({ code: '', name: '', unit: '' });
     toast.success('Товар добавлен');
   };
 
@@ -213,25 +208,12 @@ export default function Index() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex gap-4">
-                  <div className="flex-1">
-                    <Input
-                      placeholder="Поиск по названию..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full"
-                    />
-                  </div>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                    <SelectTrigger className="w-64">
-                      <SelectValue placeholder="Все категории" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Все категории</SelectItem>
-                      {CATEGORIES.map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    placeholder="Поиск по коду или названию..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full"
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
@@ -329,7 +311,7 @@ export default function Index() {
                   <CardDescription>Добавляйте новые товары в каталог</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div>
                       <Label htmlFor="productCode">Код товара</Label>
                       <Input
@@ -347,22 +329,6 @@ export default function Index() {
                         value={newProduct.name}
                         onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
                       />
-                    </div>
-                    <div>
-                      <Label htmlFor="productCategory">Категория</Label>
-                      <Select
-                        value={newProduct.category}
-                        onValueChange={(value) => setNewProduct({ ...newProduct, category: value })}
-                      >
-                        <SelectTrigger id="productCategory">
-                          <SelectValue placeholder="Выберите категорию" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CATEGORIES.map(cat => (
-                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                     </div>
                     <div>
                       <Label htmlFor="productUnit">Единица измерения</Label>
@@ -391,9 +357,8 @@ export default function Index() {
                       <div key={product.id} className="flex items-center justify-between p-3 border rounded-lg">
                         <div>
                           <p className="font-medium">{product.name}</p>
-                          <p className="text-sm text-muted-foreground">Код: {product.code} • {product.category} • {product.unit}</p>
+                          <p className="text-sm text-muted-foreground">Код: {product.code} • {product.unit}</p>
                         </div>
-                        <Badge variant="outline">{product.category}</Badge>
                       </div>
                     ))}
                   </div>
@@ -423,7 +388,6 @@ function ProductCard({ product, onAddToOrder }: { product: Product; onAddToOrder
         <div className="flex items-start justify-between mb-3">
           <div>
             <h3 className="font-semibold text-lg">{product.name}</h3>
-            <Badge variant="secondary" className="mt-1">{product.category}</Badge>
           </div>
           <Icon name="Package" size={24} className="text-muted-foreground" />
         </div>
