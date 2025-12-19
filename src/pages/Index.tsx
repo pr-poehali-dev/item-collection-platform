@@ -13,6 +13,7 @@ import * as XLSX from 'xlsx';
 
 interface Product {
   id: string;
+  code: string;
   name: string;
   category: string;
   unit: string;
@@ -21,6 +22,7 @@ interface Product {
 interface OrderItem {
   id: string;
   productId: string;
+  productCode: string;
   productName: string;
   quantity: number;
   userId: string;
@@ -31,12 +33,12 @@ const CATEGORIES = ['Овощи', 'Фрукты', 'Молочные продук
 const USERS = Array.from({ length: 12 }, (_, i) => ({ id: `user${i + 1}`, name: `Пользователь ${i + 1}` }));
 
 const INITIAL_PRODUCTS: Product[] = [
-  { id: '1', name: 'Помидоры', category: 'Овощи', unit: 'кг' },
-  { id: '2', name: 'Огурцы', category: 'Овощи', unit: 'кг' },
-  { id: '3', name: 'Яблоки', category: 'Фрукты', unit: 'кг' },
-  { id: '4', name: 'Молоко', category: 'Молочные продукты', unit: 'л' },
-  { id: '5', name: 'Курица', category: 'Мясо и рыба', unit: 'кг' },
-  { id: '6', name: 'Рис', category: 'Бакалея', unit: 'кг' },
+  { id: '1', code: 'TOV-001', name: 'Помидоры', category: 'Овощи', unit: 'кг' },
+  { id: '2', code: 'TOV-002', name: 'Огурцы', category: 'Овощи', unit: 'кг' },
+  { id: '3', code: 'TOV-003', name: 'Яблоки', category: 'Фрукты', unit: 'кг' },
+  { id: '4', code: 'TOV-004', name: 'Молоко', category: 'Молочные продукты', unit: 'л' },
+  { id: '5', code: 'TOV-005', name: 'Курица', category: 'Мясо и рыба', unit: 'кг' },
+  { id: '6', code: 'TOV-006', name: 'Рис', category: 'Бакалея', unit: 'кг' },
 ];
 
 export default function Index() {
@@ -47,10 +49,11 @@ export default function Index() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isAdmin, setIsAdmin] = useState(false);
 
-  const [newProduct, setNewProduct] = useState({ name: '', category: '', unit: '' });
+  const [newProduct, setNewProduct] = useState({ code: '', name: '', category: '', unit: '' });
 
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          product.code.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -65,6 +68,7 @@ export default function Index() {
     const newOrder: OrderItem = {
       id: Date.now().toString(),
       productId: product.id,
+      productCode: product.code,
       productName: product.name,
       quantity,
       userId: currentUser,
@@ -92,20 +96,26 @@ export default function Index() {
   };
 
   const addProduct = () => {
-    if (!newProduct.name || !newProduct.category || !newProduct.unit) {
+    if (!newProduct.code || !newProduct.name || !newProduct.category || !newProduct.unit) {
       toast.error('Заполните все поля');
+      return;
+    }
+
+    if (products.some(p => p.code === newProduct.code)) {
+      toast.error('Товар с таким кодом уже существует');
       return;
     }
 
     const product: Product = {
       id: Date.now().toString(),
+      code: newProduct.code,
       name: newProduct.name,
       category: newProduct.category,
       unit: newProduct.unit,
     };
 
     setProducts([...products, product]);
-    setNewProduct({ name: '', category: '', unit: '' });
+    setNewProduct({ code: '', name: '', category: '', unit: '' });
     toast.success('Товар добавлен');
   };
 
@@ -113,6 +123,7 @@ export default function Index() {
     const key = `${order.productName}`;
     if (!acc[key]) {
       acc[key] = {
+        productCode: order.productCode,
         productName: order.productName,
         totalQuantity: 0,
         orders: [],
@@ -121,10 +132,11 @@ export default function Index() {
     acc[key].totalQuantity += order.quantity;
     acc[key].orders.push({ id: order.id, userName: order.userName, quantity: order.quantity });
     return acc;
-  }, {} as Record<string, { productName: string; totalQuantity: number; orders: { id: string; userName: string; quantity: number }[] }>);
+  }, {} as Record<string, { productCode: string; productName: string; totalQuantity: number; orders: { id: string; userName: string; quantity: number }[] }>);
 
   const exportToExcel = () => {
     const data = Object.values(aggregatedOrders).map(item => ({
+      'Код товара': item.productCode,
       'Товар': item.productName,
       'Общее количество': item.totalQuantity,
       'Заказы': item.orders.map(u => `${u.userName}: ${u.quantity}`).join(', '),
@@ -263,7 +275,10 @@ export default function Index() {
                       <Card key={idx} className="border-l-4 border-l-primary">
                         <CardContent className="pt-6">
                           <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold">{item.productName}</h3>
+                            <div>
+                              <h3 className="text-lg font-semibold">{item.productName}</h3>
+                              <p className="text-sm text-muted-foreground">Код: {item.productCode}</p>
+                            </div>
                             <Badge variant="secondary" className="text-lg px-4 py-1">
                               Всего: {item.totalQuantity}
                             </Badge>
@@ -314,7 +329,16 @@ export default function Index() {
                   <CardDescription>Добавляйте новые товары в каталог</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div>
+                      <Label htmlFor="productCode">Код товара</Label>
+                      <Input
+                        id="productCode"
+                        placeholder="TOV-007"
+                        value={newProduct.code}
+                        onChange={(e) => setNewProduct({ ...newProduct, code: e.target.value })}
+                      />
+                    </div>
                     <div>
                       <Label htmlFor="productName">Название товара</Label>
                       <Input
@@ -367,7 +391,7 @@ export default function Index() {
                       <div key={product.id} className="flex items-center justify-between p-3 border rounded-lg">
                         <div>
                           <p className="font-medium">{product.name}</p>
-                          <p className="text-sm text-muted-foreground">{product.category} • {product.unit}</p>
+                          <p className="text-sm text-muted-foreground">Код: {product.code} • {product.category} • {product.unit}</p>
                         </div>
                         <Badge variant="outline">{product.category}</Badge>
                       </div>
@@ -403,6 +427,7 @@ function ProductCard({ product, onAddToOrder }: { product: Product; onAddToOrder
           </div>
           <Icon name="Package" size={24} className="text-muted-foreground" />
         </div>
+        <p className="text-sm text-muted-foreground mb-1">Код: {product.code}</p>
         <p className="text-sm text-muted-foreground mb-4">Единица: {product.unit}</p>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
