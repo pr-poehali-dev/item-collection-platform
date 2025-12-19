@@ -19,6 +19,7 @@ interface Product {
 }
 
 interface OrderItem {
+  id: string;
   productId: string;
   productName: string;
   quantity: number;
@@ -62,6 +63,7 @@ export default function Index() {
 
     const user = USERS.find(u => u.id === currentUser);
     const newOrder: OrderItem = {
+      id: Date.now().toString(),
       productId: product.id,
       productName: product.name,
       quantity,
@@ -71,6 +73,22 @@ export default function Index() {
 
     setOrders([...orders, newOrder]);
     toast.success(`${product.name} добавлен в заказ`);
+  };
+
+  const deleteOrder = (orderId: string) => {
+    setOrders(orders.filter(order => order.id !== orderId));
+    toast.success('Заказ удалён');
+  };
+
+  const updateOrderQuantity = (orderId: string, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      deleteOrder(orderId);
+      return;
+    }
+    setOrders(orders.map(order => 
+      order.id === orderId ? { ...order, quantity: newQuantity } : order
+    ));
+    toast.success('Количество обновлено');
   };
 
   const addProduct = () => {
@@ -97,19 +115,19 @@ export default function Index() {
       acc[key] = {
         productName: order.productName,
         totalQuantity: 0,
-        users: [],
+        orders: [],
       };
     }
     acc[key].totalQuantity += order.quantity;
-    acc[key].users.push({ userName: order.userName, quantity: order.quantity });
+    acc[key].orders.push({ id: order.id, userName: order.userName, quantity: order.quantity });
     return acc;
-  }, {} as Record<string, { productName: string; totalQuantity: number; users: { userName: string; quantity: number }[] }>);
+  }, {} as Record<string, { productName: string; totalQuantity: number; orders: { id: string; userName: string; quantity: number }[] }>);
 
   const exportToExcel = () => {
     const data = Object.values(aggregatedOrders).map(item => ({
       'Товар': item.productName,
       'Общее количество': item.totalQuantity,
-      'Заказы': item.users.map(u => `${u.userName}: ${u.quantity}`).join(', '),
+      'Заказы': item.orders.map(u => `${u.userName}: ${u.quantity}`).join(', '),
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -251,10 +269,26 @@ export default function Index() {
                             </Badge>
                           </div>
                           <div className="space-y-2">
-                            {item.users.map((user, uIdx) => (
-                              <div key={uIdx} className="flex items-center justify-between text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded">
-                                <span>{user.userName}</span>
-                                <span className="font-medium">{user.quantity}</span>
+                            {item.orders.map((order) => (
+                              <div key={order.id} className="flex items-center justify-between text-sm bg-muted/50 px-3 py-2 rounded group">
+                                <span className="text-muted-foreground">{order.userName}</span>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    value={order.quantity}
+                                    onChange={(e) => updateOrderQuantity(order.id, Number(e.target.value))}
+                                    className="w-20 h-8 text-center"
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => deleteOrder(order.id)}
+                                    className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <Icon name="Trash2" size={16} className="text-destructive" />
+                                  </Button>
+                                </div>
                               </div>
                             ))}
                           </div>
