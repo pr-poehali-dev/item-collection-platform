@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -112,6 +112,77 @@ export default function Index() {
     setProducts([...products, product]);
     setNewProduct({ code: '', name: '', unit: '' });
     toast.success('Товар добавлен');
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet) as any[];
+
+        const newProducts: Product[] = [];
+        const errors: string[] = [];
+
+        jsonData.forEach((row, idx) => {
+          const code = row['Код'] || row['code'] || row['Код товара'];
+          const name = row['Название'] || row['name'] || row['Товар'];
+          const unit = row['Единица'] || row['unit'] || row['Единица измерения'];
+
+          if (!code || !name || !unit) {
+            errors.push(`Строка ${idx + 2}: не все поля заполнены`);
+            return;
+          }
+
+          if (products.some(p => p.code === code) || newProducts.some(p => p.code === code)) {
+            errors.push(`Строка ${idx + 2}: товар с кодом ${code} уже существует`);
+            return;
+          }
+
+          newProducts.push({
+            id: `${Date.now()}-${idx}`,
+            code: String(code),
+            name: String(name),
+            unit: String(unit),
+          });
+        });
+
+        if (newProducts.length > 0) {
+          setProducts([...products, ...newProducts]);
+          toast.success(`Добавлено товаров: ${newProducts.length}`);
+        }
+
+        if (errors.length > 0) {
+          toast.error(`Ошибок: ${errors.length}. Проверьте файл.`);
+          console.error(errors);
+        }
+
+        if (newProducts.length === 0 && errors.length === 0) {
+          toast.error('Файл пуст или неверный формат');
+        }
+      } catch (error) {
+        toast.error('Ошибка чтения файла');
+        console.error(error);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
+  };
+
+  const downloadTemplate = () => {
+    const template = [
+      { 'Код': 'TOV-001', 'Название': 'Пример товара', 'Единица': 'кг' },
+    ];
+    const ws = XLSX.utils.json_to_sheet(template);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Товары');
+    XLSX.writeFile(wb, 'Шаблон_товаров.xlsx');
+    toast.success('Шаблон скачан');
   };
 
   const aggregatedOrders = orders.reduce((acc, order) => {
@@ -308,42 +379,71 @@ export default function Index() {
               <Card>
                 <CardHeader>
                   <CardTitle>Управление каталогом</CardTitle>
-                  <CardDescription>Добавляйте новые товары в каталог</CardDescription>
+                  <CardDescription>Добавляйте товары вручную или загружайте из Excel</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div>
-                      <Label htmlFor="productCode">Код товара</Label>
-                      <Input
-                        id="productCode"
-                        placeholder="TOV-007"
-                        value={newProduct.code}
-                        onChange={(e) => setNewProduct({ ...newProduct, code: e.target.value })}
-                      />
+                <CardContent className="space-y-6">
+                  <div>
+                    <h4 className="text-sm font-medium mb-3">Массовая загрузка</h4>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={downloadTemplate}>
+                        <Icon name="Download" size={18} className="mr-2" />
+                        Скачать шаблон
+                      </Button>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept=".xlsx,.xls"
+                          onChange={handleFileUpload}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          id="file-upload"
+                        />
+                        <Button variant="default">
+                          <Icon name="Upload" size={18} className="mr-2" />
+                          Загрузить Excel
+                        </Button>
+                      </div>
                     </div>
-                    <div>
-                      <Label htmlFor="productName">Название товара</Label>
-                      <Input
-                        id="productName"
-                        placeholder="Например: Картофель"
-                        value={newProduct.name}
-                        onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="productUnit">Единица измерения</Label>
-                      <Input
-                        id="productUnit"
-                        placeholder="кг, л, шт"
-                        value={newProduct.unit}
-                        onChange={(e) => setNewProduct({ ...newProduct, unit: e.target.value })}
-                      />
-                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Формат файла: колонки "Код", "Название", "Единица"
+                    </p>
                   </div>
-                  <Button onClick={addProduct} className="w-full md:w-auto">
-                    <Icon name="Plus" size={18} className="mr-2" />
-                    Добавить товар
-                  </Button>
+
+                  <div className="border-t pt-6">
+                    <h4 className="text-sm font-medium mb-3">Добавить вручную</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      <div>
+                        <Label htmlFor="productCode">Код товара</Label>
+                        <Input
+                          id="productCode"
+                          placeholder="TOV-007"
+                          value={newProduct.code}
+                          onChange={(e) => setNewProduct({ ...newProduct, code: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="productName">Название товара</Label>
+                        <Input
+                          id="productName"
+                          placeholder="Например: Картофель"
+                          value={newProduct.name}
+                          onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="productUnit">Единица измерения</Label>
+                        <Input
+                          id="productUnit"
+                          placeholder="кг, л, шт"
+                          value={newProduct.unit}
+                          onChange={(e) => setNewProduct({ ...newProduct, unit: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <Button onClick={addProduct} className="w-full md:w-auto">
+                      <Icon name="Plus" size={18} className="mr-2" />
+                      Добавить товар
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
 
