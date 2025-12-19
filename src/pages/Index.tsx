@@ -28,7 +28,12 @@ interface OrderItem {
   userName: string;
 }
 
-const USERS = Array.from({ length: 12 }, (_, i) => ({ id: `user${i + 1}`, name: `Пользователь ${i + 1}` }));
+interface User {
+  id: string;
+  name: string;
+}
+
+const INITIAL_USERS: User[] = Array.from({ length: 12 }, (_, i) => ({ id: `user${i + 1}`, name: `Пользователь ${i + 1}` }));
 
 const INITIAL_PRODUCTS: Product[] = [
   { id: '1', code: 'TOV-001', name: 'Помидоры', unit: 'кг' },
@@ -42,9 +47,12 @@ const INITIAL_PRODUCTS: Product[] = [
 export default function Index() {
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [orders, setOrders] = useState<OrderItem[]>([]);
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [currentUser, setCurrentUser] = useState<string>('user1');
   const [searchTerm, setSearchTerm] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editingUserName, setEditingUserName] = useState('');
 
   const [newProduct, setNewProduct] = useState({ code: '', name: '', unit: '' });
 
@@ -60,7 +68,7 @@ export default function Index() {
       return;
     }
 
-    const user = USERS.find(u => u.id === currentUser);
+    const user = users.find(u => u.id === currentUser);
     const newOrder: OrderItem = {
       id: Date.now().toString(),
       productId: product.id,
@@ -199,6 +207,38 @@ export default function Index() {
     toast.success('Товар удалён');
   };
 
+  const startEditingUser = (userId: string) => {
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      setEditingUserId(userId);
+      setEditingUserName(user.name);
+    }
+  };
+
+  const saveUserName = () => {
+    if (!editingUserName.trim()) {
+      toast.error('Имя не может быть пустым');
+      return;
+    }
+
+    setUsers(users.map(u => 
+      u.id === editingUserId ? { ...u, name: editingUserName } : u
+    ));
+    
+    setOrders(orders.map(o => 
+      o.userId === editingUserId ? { ...o, userName: editingUserName } : o
+    ));
+    
+    setEditingUserId(null);
+    setEditingUserName('');
+    toast.success('Имя пользователя обновлено');
+  };
+
+  const cancelEditingUser = () => {
+    setEditingUserId(null);
+    setEditingUserName('');
+  };
+
   const aggregatedOrders = orders.reduce((acc, order) => {
     const key = `${order.productName}`;
     if (!acc[key]) {
@@ -244,7 +284,7 @@ export default function Index() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {USERS.map(user => (
+                  {users.map(user => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name}
                     </SelectItem>
@@ -480,6 +520,56 @@ export default function Index() {
                         >
                           <Icon name="Trash2" size={16} className="text-destructive" />
                         </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Управление пользователями ({users.length})</CardTitle>
+                  <CardDescription>Редактируйте имена пользователей</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {users.map(user => (
+                      <div key={user.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        {editingUserId === user.id ? (
+                          <div className="flex items-center gap-2 flex-1">
+                            <Input
+                              value={editingUserName}
+                              onChange={(e) => setEditingUserName(e.target.value)}
+                              className="flex-1"
+                              placeholder="Имя пользователя"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') saveUserName();
+                                if (e.key === 'Escape') cancelEditingUser();
+                              }}
+                              autoFocus
+                            />
+                            <Button size="sm" onClick={saveUserName}>
+                              <Icon name="Check" size={16} />
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={cancelEditingUser}>
+                              <Icon name="X" size={16} />
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <div>
+                              <p className="font-medium">{user.name}</p>
+                              <p className="text-sm text-muted-foreground">ID: {user.id}</p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => startEditingUser(user.id)}
+                            >
+                              <Icon name="Pencil" size={16} />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
